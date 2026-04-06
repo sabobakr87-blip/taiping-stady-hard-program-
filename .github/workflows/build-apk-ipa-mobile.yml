@@ -29,7 +29,6 @@ jobs:
 
     - name: Build EXE
       run: |
-        # الأمر ده بيطلع ملف واحد بأيقونة وبدون شاشة سوداء
         pyinstaller --noconsole --onefile --icon="logo.ico" --add-data "logo.ico;." --name "TaipingStudy" main.py
 
     - name: Upload EXE
@@ -50,25 +49,28 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install Buildozer dependencies
+    - name: Install Buildozer and Fixed Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential git python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev zlib1g-dev libgstreamer1.0-dev
-        pip install --user --upgrade buildozer cython
+        # الحل هنا: تثبيت setuptools لحل مشكلة distutils وتثبيت نسخة حديثة من Cython
+        pip install --upgrade pip
+        pip install setuptools cython buildozer
 
     - name: Build APK with Buildozer
       run: |
-        # إنشاء ملف الإعدادات لو مش موجود وتعديله برمجياً
         if [ ! -f buildozer.spec ]; then
           buildozer init
           sed -i 's/^title = .*/title = TaipingStudy/' buildozer.spec
           sed -i 's/^package.name = .*/package.name = taiping/' buildozer.spec
           sed -i 's/^requirements = .*/requirements = python3,kivy,webview/' buildozer.spec
           sed -i 's/^orientation = .*/orientation = portrait/' buildozer.spec
+          # تعديل مهم للأندرويد ليتوافق مع النسخ الجديدة
+          sed -i 's/^android.archs = .*/android.archs = arm64-v8a, armeabi-v7a/' buildozer.spec
         fi
-        # أمر بناء الأندرويد (بياخد وقت شوية)
+        # تشغيل البناء
         buildozer -v android debug
-
+      
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
