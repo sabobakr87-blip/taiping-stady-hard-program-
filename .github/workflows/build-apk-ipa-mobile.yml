@@ -7,10 +7,9 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  PYTHON_VERSION: 3.12.2
 
 jobs:
-  # --- 1. بناء نسخة الويندوز (تم بنجاح سابقاً ولكن نؤكد عليه) ---
+  # --- 1. بناء نسخة الويندوز (تحويل PNG لـ ICO واستخدامها) ---
   build-windows:
     runs-on: windows-latest
     steps:
@@ -20,17 +19,20 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: '3.12'
 
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller pywebview
+        pip install pyinstaller pywebview pillow # أضفنا pillow لتحويل الصورة
 
-    - name: Build EXE
+    - name: Convert PNG to ICO and Build
       run: |
-        # التأكد من استخدام الأيقونة لو موجودة
-        if (Test-Path "logo.ico") {
+        # التأكد من وجود الصورة الأصلية
+        if (Test-Path "0.png") {
+          # كود بايثون سريع لتحويل 0.png لـ logo.ico بمقاسات مناسبة
+          python -c "from PIL import Image; img = Image.open('0.png'); img.save('logo.ico', format='ICO', sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])"
+          # بناء الـ EXE باستخدام الأيقونة الجديدة
           pyinstaller --noconsole --onefile --icon="logo.ico" --add-data "logo.ico;." --name "TaipingStudy" main.py
         } else {
           pyinstaller --noconsole --onefile --name "TaipingStudy" main.py
@@ -42,9 +44,9 @@ jobs:
         name: Windows-App
         path: dist/TaipingStudy.exe
 
-  # --- 2. بناء نسخة الأندرويد (حل مشكلة الفشل) ---
+  # --- 2. بناء نسخة الأندرويد (استخدام PNG للأيقونة) ---
   build-android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -52,29 +54,30 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: '3.11'
 
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential git python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev zlib1g-dev libgstreamer1.0-dev openjdk-17-jdk-headless zip unzip
+        sudo apt-get install -y build-essential git python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev zlib1g-dev libgstreamer1.0-dev openjdk-17-jdk-headless zip unzip autoconf automake libtool pkg-config libncurses5-dev libncursesw5-dev cmake
         pip install --upgrade pip
         pip install setuptools cython buildozer
 
     - name: Build APK
       run: |
-        # إنشاء ملف الإعدادات وضبط التراخيص
+        # تهيئة الإعدادات وضبط الأيقونة
         if [ ! -f buildozer.spec ]; then
           buildozer init
           sed -i 's/^requirements = .*/requirements = python3,kivy,webview/' buildozer.spec
           sed -i 's/^android.accept_sdk_license = .*/android.accept_sdk_license = True/' buildozer.spec
-          sed -i 's/^android.archs = .*/android.archs = arm64-v8a, armeabi-v7a/' buildozer.spec
+          # تعديل أيقونة الأندرويد لتكون 0.png
+          if [ -f "0.png" ]; then
+            sed -i 's/#icon.filename = .*/icon.filename = %(source.dir)s\/0.png/' buildozer.spec
+          fi
         fi
         
-        # تنظيف أي بناء قديم فاشل
-        buildozer android clean
-        # محاولة البناء مع عرض تفاصيل الخطأ لو حصل
-        buildozer -v android debug
+        # التنظيف وبناء الأندرويد
+        buildozer android debug
       
     - name: Upload APK
       uses: actions/upload-artifact@v4
