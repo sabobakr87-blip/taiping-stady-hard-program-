@@ -10,7 +10,7 @@ env:
   PYTHON_VERSION: 3.12.2
 
 jobs:
-  # --- 1. بناء نسخة الويندوز ---
+  # --- 1. بناء نسخة الويندوز (تم بنجاح سابقاً ولكن نؤكد عليه) ---
   build-windows:
     runs-on: windows-latest
     steps:
@@ -29,21 +29,20 @@ jobs:
 
     - name: Build EXE
       run: |
-        # أضفنا شرط التأكد من وجود الأيقونة قبل البدء لتجنب الخطأ
+        # التأكد من استخدام الأيقونة لو موجودة
         if (Test-Path "logo.ico") {
           pyinstaller --noconsole --onefile --icon="logo.ico" --add-data "logo.ico;." --name "TaipingStudy" main.py
         } else {
           pyinstaller --noconsole --onefile --name "TaipingStudy" main.py
-          echo "Warning: logo.ico not found, building without icon"
         }
 
     - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: Windows-Version-EXE
+        name: Windows-App
         path: dist/TaipingStudy.exe
 
-  # --- 2. بناء نسخة الأندرويد ---
+  # --- 2. بناء نسخة الأندرويد (حل مشكلة الفشل) ---
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -55,33 +54,30 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install Buildozer dependencies
+    - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential git python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev zlib1g-dev libgstreamer1.0-dev
-        # إضافة أدوات الأندرويد الأساسية
-        sudo apt-get install -y openjdk-17-jdk-headless zip unzip
+        sudo apt-get install -y build-essential git python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev zlib1g-dev libgstreamer1.0-dev openjdk-17-jdk-headless zip unzip
         pip install --upgrade pip
         pip install setuptools cython buildozer
 
-    - name: Build APK with Buildozer
+    - name: Build APK
       run: |
-        # إنشاء ملف الإعدادات لو مش موجود
+        # إنشاء ملف الإعدادات وضبط التراخيص
         if [ ! -f buildozer.spec ]; then
           buildozer init
           sed -i 's/^requirements = .*/requirements = python3,kivy,webview/' buildozer.spec
+          sed -i 's/^android.accept_sdk_license = .*/android.accept_sdk_license = True/' buildozer.spec
           sed -i 's/^android.archs = .*/android.archs = arm64-v8a, armeabi-v7a/' buildozer.spec
-          # قبول التراخيص تلقائياً
-          sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
         fi
         
-        # أمر سحري لحل مشكلة Aidl والـ SDK في جيت هاب
-        yes | buildozer android debug || true
-        # المحاولة الثانية بعد تثبيت الـ SDK تلقائياً
+        # تنظيف أي بناء قديم فاشل
+        buildozer android clean
+        # محاولة البناء مع عرض تفاصيل الخطأ لو حصل
         buildozer -v android debug
-
+      
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Android-Version-APK
+        name: Android-App
         path: bin/*.apk
