@@ -20,7 +20,11 @@ jobs:
     - name: Install System Dependencies
       run: |
         sudo apt-get update
+        # حل مشكلة Broken Packages بتثبيت المكتبات الناقصة يدوياً
+        sudo apt-get install -y --fix-broken
+        sudo apt-get install -y libunwind-dev
         sudo apt-get install -y build-essential git python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev zlib1g-dev libgstreamer1.0-dev openjdk-17-jdk-headless zip unzip autoconf automake libtool pkg-config libncurses5-dev libncursesw5-dev cmake
+        
         pip install --upgrade pip
         pip install setuptools "cython<3.0" buildozer
 
@@ -37,12 +41,11 @@ jobs:
           fi
         fi
         
-        # التنظيف الإجباري
+        # تنظيف وبناء
         rm -rf .buildozer
         
-        # السطر ده بيحل مشكلة Aidl عن طريق إجبار Buildozer على تحميل الـ SDK بالكامل
+        # قبول التراخيص وبدء البناء
         yes | buildozer android debug || true
-        # المحاولة النهائية للبناء
         buildozer -v android debug
       
     - name: Upload APK
